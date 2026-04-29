@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Plus, Edit, Trash2, Users, UserCheck, UserX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,42 +23,85 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AddMemberForm } from "@/components/forms/add-member-form";
-import { members as initialMembers, Member } from "@/lib/data";
+import { api } from "@/lib/api";
+
+// Utility to format dates as DD-MM-YYYY
+function formatDate(dateString: string | Date) {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
 
 export default function ManageMembersPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [membersList, setMembersList] = useState<Member[]>(initialMembers);
+  const [membersList, setMembersList] = useState<any[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editingMember, setEditingMember] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMembers = async () => {
+    try {
+      setLoading(true);
+      const data = await api.members.list();
+      setMembersList(data as any[]);
+    } catch (error) {
+      console.error("Failed to fetch members", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMembers();
+  }, []);
 
   const filteredMembers = membersList.filter(
     (member) =>
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      `${member.first_name} ${member.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddMember = (newMember: Omit<Member, "id">) => {
-    const member: Member = {
-      ...newMember,
-      id: String(membersList.length + 1),
-    };
-    setMembersList([...membersList, member]);
-    setIsAddDialogOpen(false);
+  const handleAddMember = async (newMember: any) => {
+    try {
+      await api.members.create(newMember);
+      await fetchMembers();
+      setIsAddDialogOpen(false);
+      alert("Member added successfully!");
+    } catch (error) {
+      console.error("Failed to add member", error);
+      alert("Failed to add member.");
+    }
   };
 
-  const handleEditMember = (updatedMember: Omit<Member, "id">) => {
+  const handleEditMember = async (updatedMember: any) => {
     if (!editingMember) return;
-    setMembersList(
-      membersList.map((m) =>
-        m.id === editingMember.id ? { ...m, ...updatedMember } : m
-      )
-    );
-    setEditingMember(null);
+    try {
+      await api.members.update(editingMember.member_id.toString(), updatedMember);
+      await fetchMembers();
+      setEditingMember(null);
+      alert("Member updated successfully!");
+    } catch (error) {
+      console.error("Failed to update member", error);
+      alert("Failed to update member.");
+    }
   };
 
-  const handleDeleteMember = (id: string) => {
-    setMembersList(membersList.filter((m) => m.id !== id));
+  const handleDeleteMember = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this member?")) return;
+    try {
+      await api.members.delete(id);
+      await fetchMembers();
+    } catch (error) {
+      console.error("Failed to delete member", error);
+      alert("Failed to delete member.");
+    }
   };
+
+  if (loading) {
+    return <div className="p-6">Loading members...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -73,7 +116,7 @@ export default function ManageMembersPage() {
               <Plus className="mr-2 h-4 w-4" /> Add Member
             </Button>
           </DialogTrigger>
-          <DialogContent className="border-border bg-card sm:max-w-lg">
+          <DialogContent className="border-border bg-card sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle className="text-card-foreground">Add New Member</DialogTitle>
               <DialogDescription className="text-muted-foreground">
@@ -141,19 +184,27 @@ export default function ManageMembersPage() {
                 <TableRow className="border-border">
                   <TableHead className="text-muted-foreground">Name</TableHead>
                   <TableHead className="text-muted-foreground">Email</TableHead>
+                  <TableHead className="text-muted-foreground">Dept & Year</TableHead>
+                  <TableHead className="text-muted-foreground">Phone</TableHead>
                   <TableHead className="text-muted-foreground">Join Date</TableHead>
-                  <TableHead className="text-muted-foreground">Books Issued</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
                   <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredMembers.map((member) => (
-                  <TableRow key={member.id} className="border-border">
-                    <TableCell className="font-medium text-foreground">{member.name}</TableCell>
+                  <TableRow key={member.member_id} className="border-border">
+                    <TableCell className="font-medium text-foreground">
+                      {member.first_name} {member.middle_name ? member.middle_name + " " : ""}{member.last_name}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{member.email}</TableCell>
-                    <TableCell className="text-muted-foreground">{member.joinDate}</TableCell>
-                    <TableCell className="text-muted-foreground">{member.booksIssued}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {member.department} (Year {member.year})
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-[150px] truncate" title={member.phone}>
+                      {member.phone}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{formatDate(member.join_date)}</TableCell>
                     <TableCell>
                       <Badge
                         className={
@@ -168,7 +219,7 @@ export default function ManageMembersPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Dialog
-                          open={editingMember?.id === member.id}
+                          open={editingMember?.member_id === member.member_id}
                           onOpenChange={(open) => !open && setEditingMember(null)}
                         >
                           <DialogTrigger asChild>
@@ -181,7 +232,7 @@ export default function ManageMembersPage() {
                               <Edit className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="border-border bg-card sm:max-w-lg">
+                          <DialogContent className="border-border bg-card sm:max-w-2xl">
                             <DialogHeader>
                               <DialogTitle className="text-card-foreground">Edit Member</DialogTitle>
                               <DialogDescription className="text-muted-foreground">
@@ -200,7 +251,7 @@ export default function ManageMembersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteMember(member.id)}
+                          onClick={() => handleDeleteMember(member.member_id.toString())}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />

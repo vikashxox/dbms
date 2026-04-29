@@ -1,26 +1,99 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { BookOpen, Users, BookMarked, AlertTriangle, TrendingUp, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { books, members, borrowedBooks } from "@/lib/data";
+import { api } from "@/lib/api";
+
+// Utility to format dates as DD-MM-YYYY
+function formatDate(dateString: string | Date) {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
 
 export default function LibrarianDashboard() {
+  const [books, setBooks] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [borrows, setBorrows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const [booksData, membersData, borrowsData] = await Promise.all([
+          api.books.list(),
+          api.members.list(),
+          api.borrows.list()
+        ]);
+        setBooks(booksData as any[]);
+        setMembers(membersData as any[]);
+        setBorrows(borrowsData as any[]);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
   const totalBooks = books.length;
   const totalMembers = members.length;
-  const totalBorrowed = borrowedBooks.length;
-  const overdueBooks = borrowedBooks.filter((b) => b.isOverdue);
-  const availableBooks = books.filter((b) => b.available).length;
-  const activeMembers = members.filter((m) => m.status === "active").length;
+  
+  // Calculate active borrows
+  const activeBorrows = borrows.filter(b => b.borrow_status === "issued");
+  const totalBorrowed = activeBorrows.length;
+  
+  // Calculate available books (Total - Issued)
+  const availableBooks = totalBooks - totalBorrowed;
+  
+  const activeMembersCount = members.filter((m) => m.status === "active").length;
+  
+  const overdueBooks = activeBorrows.filter(b => new Date(b.due_date) < new Date());
 
-  const recentActivity = [
-    { action: "Book Borrowed", detail: "The Great Gatsby by John Smith", time: "2 hours ago", type: "borrow" },
-    { action: "New Member", detail: "Sarah Davis joined", time: "5 hours ago", type: "member" },
-    { action: "Book Returned", detail: "Clean Code by Emily Johnson", time: "1 day ago", type: "return" },
-    { action: "Overdue Notice", detail: "To Kill a Mockingbird - John Smith", time: "2 days ago", type: "overdue" },
-  ];
+  // Generate dynamic recent activity
+  const getRecentActivity = () => {
+    const activity: any[] = [];
+    
+    // Add recent borrows
+    borrows.slice(-3).forEach(b => {
+      activity.push({
+        action: b.borrow_status === "returned" ? "Book Returned" : "Book Borrowed",
+        detail: `${b.book?.title} by ${b.member?.first_name} ${b.member?.last_name}`,
+        time: new Date(b.borrow_status === "returned" ? b.return_date : b.issue_date),
+        type: b.borrow_status === "returned" ? "return" : "borrow"
+      });
+    });
+
+    // Add recent members
+    members.slice(-2).forEach(m => {
+      activity.push({
+        action: "New Member",
+        detail: `${m.first_name} ${m.last_name} joined`,
+        time: new Date(m.join_date),
+        type: "member"
+      });
+    });
+
+    // Sort by most recent
+    return activity.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 4).map(item => ({
+      ...item,
+      time: formatDate(item.time)
+    }));
+  };
+
+  const recentActivity = getRecentActivity();
+
+  if (loading) {
+    return <div className="p-6">Loading dashboard...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -47,7 +120,7 @@ export default function LibrarianDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-card-foreground">{totalMembers}</div>
-            <p className="text-xs text-muted-foreground">{activeMembers} active</p>
+            <p className="text-xs text-muted-foreground">{activeMembersCount} active</p>
           </CardContent>
         </Card>
         <Card className="border-border bg-card">
@@ -59,7 +132,7 @@ export default function LibrarianDashboard() {
             <div className="text-2xl font-bold text-card-foreground">{totalBorrowed}</div>
             <div className="flex items-center text-xs text-primary">
               <TrendingUp className="mr-1 h-3 w-3" />
-              +12% this month
+              Live Count
             </div>
           </CardContent>
         </Card>
@@ -92,14 +165,14 @@ export default function LibrarianDashboard() {
               <div className="flex flex-col gap-3">
                 {overdueBooks.slice(0, 3).map((item) => (
                   <div
-                    key={item.id}
+                    key={item.borrow_id}
                     className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 p-3"
                   >
                     <div>
-                      <p className="font-medium text-card-foreground">{item.bookTitle}</p>
-                      <p className="text-sm text-muted-foreground">{item.memberName}</p>
+                      <p className="font-medium text-card-foreground">{item.book?.title}</p>
+                      <p className="text-sm text-muted-foreground">{item.member?.first_name} {item.member?.last_name}</p>
                     </div>
-                    <Badge className="bg-destructive/20 text-destructive">Due: {item.dueDate}</Badge>
+                    <Badge className="bg-destructive/20 text-destructive">Due: {formatDate(item.due_date)}</Badge>
                   </div>
                 ))}
               </div>
@@ -125,6 +198,9 @@ export default function LibrarianDashboard() {
                   <span className="text-xs text-muted-foreground">{activity.time}</span>
                 </div>
               ))}
+              {recentActivity.length === 0 && (
+                <p className="text-center text-muted-foreground">No recent activity.</p>
+              )}
             </div>
           </CardContent>
         </Card>
