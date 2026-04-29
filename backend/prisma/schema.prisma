@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Member {
+  member_id   Int       @id @default(autoincrement())
+  first_name  String
+  middle_name String?
+  last_name   String
+  year        Int
+  department  String
+  phone       String
+  email       String    @unique
+  join_date   DateTime  @default(now())
+  address     String
+  status      String    @default("active")
+  password    String
+  borrows     Borrow[]
+}
+
+model Librarian {
+  librarian_id Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  phone        String
+  shift_time   String
+  password     String
+  books        Book[]   @relation("LibrarianBooks")
+}
+
+model Publisher {
+  publisher_id      Int      @id @default(autoincrement())
+  publisher_name    String
+  publisher_address String
+  publisher_phone   String
+  publisher_email   String   @unique
+  books             Book[]
+}
+
+model Author {
+  author_id    Int       @id @default(autoincrement())
+  author_name  String
+  author_email String    @unique
+  address      String
+  writtenBooks WrittenBy[]
+}
+
+model Book {
+  book_id        Int         @id @default(autoincrement())
+  title          String
+  isbn           String      @unique
+  edition        String
+  category       String
+  language       String
+  price          Float
+  shelf_location String
+  publisher_id   Int
+  librarian_id   Int
+  publisher      Publisher   @relation(fields: [publisher_id], references: [publisher_id])
+  librarian      Librarian   @relation("LibrarianBooks", fields: [librarian_id], references: [librarian_id])
+  borrows        Borrow[]
+  authors        WrittenBy[]
+}
+
+model Borrow {
+  borrow_id     Int      @id @default(autoincrement())
+  member_id     Int
+  book_id       Int
+  issue_date    DateTime @default(now())
+  due_date      DateTime
+  return_date   DateTime?
+  fine_amount   Float    @default(0)
+  borrow_status String   @default("issued")
+  member        Member   @relation(fields: [member_id], references: [member_id])
+  book          Book     @relation(fields: [book_id], references: [book_id])
+}
+
+model WrittenBy {
+  book_id   Int
+  author_id Int
+  book      Book   @relation(fields: [book_id], references: [book_id])
+  author    Author @relation(fields: [author_id], references: [author_id])
+
+  @@id([book_id, author_id])
+}
