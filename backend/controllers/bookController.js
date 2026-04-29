@@ -100,7 +100,23 @@ const updateBook = async (req, res, next) => {
 const deleteBook = async (req, res, next) => {
   try {
     const book_id = parseInt(req.params.id, 10);
-    await prisma.book.delete({ where: { book_id } });
+
+    // Prevent deletion if the book is currently borrowed out
+    const activeBorrow = await prisma.borrow.findFirst({
+      where: { book_id, borrow_status: "issued" }
+    });
+    
+    if (activeBorrow) {
+      return res.status(400).json({ error: "Cannot delete a book that is currently issued to a member." });
+    }
+
+    // Use a transaction to delete related records first to satisfy foreign key constraints
+    await prisma.$transaction([
+      prisma.writtenBy.deleteMany({ where: { book_id } }),
+      prisma.borrow.deleteMany({ where: { book_id } }),
+      prisma.book.delete({ where: { book_id } })
+    ]);
+
     res.json({ message: "Book deleted successfully" });
   } catch (error) {
     next(error);

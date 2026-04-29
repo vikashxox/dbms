@@ -46,7 +46,12 @@ const updateAuthor = async (req, res, next) => {
 const deleteAuthor = async (req, res, next) => {
   try {
     const author_id = parseInt(req.params.id, 10);
-    await prisma.author.delete({ where: { author_id } });
+    
+    await prisma.$transaction([
+      prisma.writtenBy.deleteMany({ where: { author_id } }),
+      prisma.author.delete({ where: { author_id } })
+    ]);
+    
     res.json({ message: "Author deleted successfully" });
   } catch (error) {
     next(error);

@@ -106,10 +106,6 @@ export default function ManageBooksPage() {
     try {
       const bookPayload = {
         ...newBookData,
-        price: 0,
-        edition: "1st",
-        language: "English",
-        shelf_location: "General",
         librarian_id: librarianId || 1 // fallback to 1
       };
       

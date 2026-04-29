@@ -4,23 +4,23 @@ interface FetchOptions extends RequestInit {
   skipAuth?: boolean;
 }
 
-export async function apiCall<T>(
+export async function apiCall<T = any>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<T> {
   const { skipAuth = false, ...fetchOptions } = options;
 
   const url = `${API_URL}${endpoint}`;
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...fetchOptions.headers,
+    ...(fetchOptions.headers as Record<string, string> || {}),
   };
 
   // Add JWT token if not skipped
   if (!skipAuth) {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
   }
 

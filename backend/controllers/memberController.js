@@ -64,7 +64,19 @@ const updateMember = async (req, res, next) => {
 const deleteMember = async (req, res, next) => {
   try {
     const member_id = parseInt(req.params.id, 10);
-    await prisma.member.delete({ where: { member_id } });
+    const activeBorrow = await prisma.borrow.findFirst({
+      where: { member_id, borrow_status: "issued" }
+    });
+    
+    if (activeBorrow) {
+      return res.status(400).json({ error: "Cannot delete a member with active unreturned books." });
+    }
+
+    await prisma.$transaction([
+      prisma.borrow.deleteMany({ where: { member_id } }),
+      prisma.member.delete({ where: { member_id } })
+    ]);
+    
     res.json({ message: "Member deleted successfully" });
   } catch (error) {
     next(error);

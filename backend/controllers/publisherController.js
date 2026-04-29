@@ -48,6 +48,12 @@ const updatePublisher = async (req, res, next) => {
 const deletePublisher = async (req, res, next) => {
   try {
     const publisher_id = parseInt(req.params.id, 10);
+    
+    const hasBooks = await prisma.book.findFirst({ where: { publisher_id } });
+    if (hasBooks) {
+      return res.status(400).json({ error: "Cannot delete a publisher that has books associated with it." });
+    }
+    
     await prisma.publisher.delete({ where: { publisher_id } });
     res.json({ message: "Publisher deleted successfully" });
   } catch (error) {
