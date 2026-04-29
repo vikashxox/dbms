@@ -170,6 +170,32 @@ export default function LibrarianDashboard() {
             </CardContent>
           </Card>
         </Link>
+        <Link href="/librarian/authors">
+          <Card className="cursor-pointer border-border bg-card transition-all hover:border-primary">
+            <CardContent className="flex items-center gap-4 p-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-500/20">
+                <Users className="h-6 w-6 text-indigo-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-card-foreground">Manage Authors</h3>
+                <p className="text-sm text-muted-foreground">Add, edit, or remove authors</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/librarian/publishers">
+          <Card className="cursor-pointer border-border bg-card transition-all hover:border-primary">
+            <CardContent className="flex items-center gap-4 p-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/20">
+                <BookOpen className="h-6 w-6 text-orange-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-card-foreground">Manage Publishers</h3>
+                <p className="text-sm text-muted-foreground">Add, edit, or remove publishers</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   );

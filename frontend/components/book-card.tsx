@@ -10,9 +10,10 @@ interface BookCardProps {
   book: Book;
   onBorrow?: (bookId: string) => void;
   showBorrowButton?: boolean;
+  isInCart?: boolean;
 }
 
-export function BookCard({ book, onBorrow, showBorrowButton = true }: BookCardProps) {
+export function BookCard({ book, onBorrow, showBorrowButton = true, isInCart = false }: BookCardProps) {
   return (
     <Card className="overflow-hidden border-border bg-card transition-all hover:border-muted-foreground">
       <div className={`flex h-32 items-center justify-center ${book.coverColor}`}>
@@ -29,7 +30,7 @@ export function BookCard({ book, onBorrow, showBorrowButton = true }: BookCardPr
             variant={book.available ? "default" : "destructive"}
             className={book.available ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"}
           >
-            {book.available ? "Available" : "Borrowed"}
+            {book.available ? "Available" : "Issued"}
           </Badge>
         </div>
       </CardContent>
@@ -37,10 +38,11 @@ export function BookCard({ book, onBorrow, showBorrowButton = true }: BookCardPr
         <CardFooter className="border-t border-border p-4">
           <Button
             onClick={() => onBorrow?.(book.id)}
-            disabled={!book.available}
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            disabled={!book.available || isInCart}
+            variant={isInCart ? "secondary" : "default"}
+            className={`w-full ${!isInCart ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""} disabled:opacity-50`}
           >
-            {book.available ? "Borrow Book" : "Not Available"}
+            {!book.available ? "Not Available" : isInCart ? "In Cart" : "Add to Cart"}
           </Button>
         </CardFooter>
       )}

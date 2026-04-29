@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Plus, Edit, Trash2, BookOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,45 +23,135 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AddBookForm } from "@/components/forms/add-book-form";
-import { books as initialBooks, Book } from "@/lib/data";
+import { api } from "@/lib/api";
+
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
 
 export default function ManageBooksPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [booksList, setBooksList] = useState<Book[]>(initialBooks);
+  const [booksList, setBooksList] = useState<any[]>([]);
+  const [authorsList, setAuthorsList] = useState<any[]>([]);
+  const [publishersList, setPublishersList] = useState<any[]>([]);
+  const [allBorrows, setAllBorrows] = useState<any[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [editingBook, setEditingBook] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [librarianId, setLibrarianId] = useState<number | null>(null);
 
-  const filteredBooks = booksList.filter(
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      const decoded = parseJwt(token);
+      if (decoded && decoded.id) setLibrarianId(parseInt(decoded.id, 10));
+    }
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [books, authors, publishers, borrows] = await Promise.all([
+        api.books.list(),
+        api.authors.list(),
+        api.publishers.list(),
+        api.borrows.list()
+      ]);
+      setBooksList(books as any[]);
+      setAuthorsList(authors as any[]);
+      setPublishersList(publishers as any[]);
+      setAllBorrows(borrows as any[]);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getMappedBooks = () => {
+    return booksList.map((b) => {
+      const isBorrowed = allBorrows.some(borrow => borrow.book_id === b.book_id && borrow.borrow_status === "issued");
+      return {
+        id: b.book_id.toString(),
+        title: b.title,
+        author: b.authors && b.authors.length > 0 ? b.authors.map((a: any) => a.author.author_name).join(", ") : "Unknown Author",
+        category: b.category,
+        isbn: b.isbn,
+        available: !isBorrowed,
+        ...b
+      };
+    });
+  };
+
+  const mappedBooks = getMappedBooks();
+
+  const filteredBooks = mappedBooks.filter(
     (book) =>
       book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
       book.isbn.includes(searchQuery)
   );
 
-  const handleAddBook = (newBook: Omit<Book, "id" | "coverColor">) => {
-    const colors = ["bg-emerald-600", "bg-blue-600", "bg-red-600", "bg-pink-600", "bg-yellow-600", "bg-cyan-600"];
-    const book: Book = {
-      ...newBook,
-      id: String(booksList.length + 1),
-      coverColor: colors[Math.floor(Math.random() * colors.length)],
-    };
-    setBooksList([...booksList, book]);
-    setIsAddDialogOpen(false);
+  const handleAddBook = async (newBookData: any) => {
+    try {
+      const bookPayload = {
+        ...newBookData,
+        price: 0,
+        edition: "1st",
+        language: "English",
+        shelf_location: "General",
+        librarian_id: librarianId || 1 // fallback to 1
+      };
+      
+      const created = await api.books.create(bookPayload);
+      setBooksList([...booksList, created]);
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to add book", error);
+      alert("Failed to add book. Make sure Publisher and Author are selected.");
+    }
   };
 
-  const handleEditBook = (updatedBook: Omit<Book, "id" | "coverColor">) => {
+  const handleEditBook = async (updatedBookData: any) => {
     if (!editingBook) return;
-    setBooksList(
-      booksList.map((b) =>
-        b.id === editingBook.id ? { ...b, ...updatedBook } : b
-      )
-    );
-    setEditingBook(null);
+    try {
+      const updated = await api.books.update(editingBook.book_id.toString(), updatedBookData);
+      setBooksList(
+        booksList.map((b) =>
+          b.book_id === updated.book_id ? updated : b
+        )
+      );
+      setEditingBook(null);
+    } catch (error) {
+      console.error("Failed to edit book", error);
+      alert("Failed to edit book.");
+    }
   };
 
-  const handleDeleteBook = (id: string) => {
-    setBooksList(booksList.filter((b) => b.id !== id));
+  const handleDeleteBook = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this book?")) return;
+    try {
+      await api.books.delete(id);
+      setBooksList(booksList.filter((b) => b.book_id.toString() !== id));
+    } catch (error) {
+      console.error("Failed to delete book", error);
+      alert("Failed to delete book. It might be currently borrowed.");
+    }
   };
+
+  if (loading) {
+    return <div className="p-6">Loading books...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -83,7 +173,12 @@ export default function ManageBooksPage() {
                 Fill in the details to add a new book to the library.
               </DialogDescription>
             </DialogHeader>
-            <AddBookForm onSubmit={handleAddBook} onCancel={() => setIsAddDialogOpen(false)} />
+            <AddBookForm 
+              onSubmit={handleAddBook} 
+              onCancel={() => setIsAddDialogOpen(false)} 
+              authorsList={authorsList}
+              publishersList={publishersList}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -95,7 +190,7 @@ export default function ManageBooksPage() {
             <BookOpen className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">{booksList.length}</div>
+            <div className="text-2xl font-bold text-card-foreground">{mappedBooks.length}</div>
           </CardContent>
         </Card>
         <Card className="border-border bg-card">
@@ -105,7 +200,7 @@ export default function ManageBooksPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-card-foreground">
-              {booksList.filter((b) => b.available).length}
+              {mappedBooks.filter((b) => b.available).length}
             </div>
           </CardContent>
         </Card>
@@ -116,7 +211,7 @@ export default function ManageBooksPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-card-foreground">
-              {booksList.filter((b) => !b.available).length}
+              {mappedBooks.filter((b) => !b.available).length}
             </div>
           </CardContent>
         </Card>
@@ -175,7 +270,7 @@ export default function ManageBooksPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Dialog
-                          open={editingBook?.id === book.id}
+                          open={editingBook?.book_id === book.book_id}
                           onOpenChange={(open) => !open && setEditingBook(null)}
                         >
                           <DialogTrigger asChild>
@@ -200,6 +295,8 @@ export default function ManageBooksPage() {
                                 onSubmit={handleEditBook}
                                 onCancel={() => setEditingBook(null)}
                                 initialData={editingBook}
+                                authorsList={authorsList}
+                                publishersList={publishersList}
                               />
                             )}
                           </DialogContent>

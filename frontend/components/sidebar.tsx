@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Home, Library, Users, Settings, LogOut, BookMarked, AlertTriangle } from "lucide-react";
+import { BookOpen, Home, Library, Users, Settings, LogOut, BookMarked, AlertTriangle, Building } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -17,6 +17,8 @@ const memberLinks = [
 const librarianLinks = [
   { href: "/librarian", label: "Dashboard", icon: Home },
   { href: "/librarian/books", label: "Manage Books", icon: Library },
+  { href: "/librarian/authors", label: "Manage Authors", icon: Users },
+  { href: "/librarian/publishers", label: "Manage Publishers", icon: Building },
   { href: "/librarian/members", label: "Manage Members", icon: Users },
   { href: "/librarian/overdue", label: "Overdue Books", icon: AlertTriangle },
 ];

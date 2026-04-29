@@ -99,6 +99,7 @@ export const api = {
     list: () => apiCall("/api/borrows", { method: "GET" }),
     get: (id: string) => apiCall(`/api/borrows/${id}`, { method: "GET" }),
     create: (data: any) => apiCall("/api/borrows", { method: "POST", body: JSON.stringify(data) }),
+    return: (id: string, data?: any) => apiCall(`/api/borrows/${id}/return`, { method: "POST", body: JSON.stringify(data || {}) }),
     update: (id: string, data: any) =>
       apiCall(`/api/borrows/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     delete: (id: string) => apiCall(`/api/borrows/${id}`, { method: "DELETE" }),

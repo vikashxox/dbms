@@ -5,7 +5,7 @@ const calculateFine = (dueDate, returnDate) => {
 
   const msPerDay = 24 * 60 * 60 * 1000;
   const lateDays = Math.ceil((returnDate - dueDate) / msPerDay);
-  const fineRate = 10;
+  const fineRate = 1;
   return lateDays * fineRate;
 };
 

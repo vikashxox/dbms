@@ -11,18 +11,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Book, categories, authors, publishers } from "@/lib/data";
+
+export const categories = [
+  "All",
+  "Fiction",
+  "Non-Fiction",
+  "Science",
+  "History",
+  "Technology",
+  "Literature",
+];
 
 interface AddBookFormProps {
-  onSubmit: (book: Omit<Book, "id" | "coverColor">) => void;
+  onSubmit: (book: any) => void;
   onCancel: () => void;
-  initialData?: Book;
+  initialData?: any;
+  authorsList?: any[];
+  publishersList?: any[];
 }
 
-export function AddBookForm({ onSubmit, onCancel, initialData }: AddBookFormProps) {
+export function AddBookForm({ onSubmit, onCancel, initialData, authorsList = [], publishersList = [] }: AddBookFormProps) {
   const [title, setTitle] = useState(initialData?.title || "");
-  const [author, setAuthor] = useState(initialData?.author || "");
-  const [publisher, setPublisher] = useState(initialData?.publisher || "");
+  const [authorId, setAuthorId] = useState(
+    initialData?.authors && initialData.authors.length > 0 
+      ? initialData.authors[0].author_id.toString() 
+      : ""
+  );
+  const [publisherId, setPublisherId] = useState(
+    initialData?.publisher_id ? initialData.publisher_id.toString() : ""
+  );
   const [category, setCategory] = useState(initialData?.category || "");
   const [isbn, setIsbn] = useState(initialData?.isbn || "");
   const [available, setAvailable] = useState(initialData?.available ?? true);
@@ -31,8 +48,8 @@ export function AddBookForm({ onSubmit, onCancel, initialData }: AddBookFormProp
     e.preventDefault();
     onSubmit({
       title,
-      author,
-      publisher,
+      authorIds: authorId ? [parseInt(authorId, 10)] : [],
+      publisher_id: publisherId ? parseInt(publisherId, 10) : undefined,
       category,
       isbn,
       available,
@@ -59,14 +76,14 @@ export function AddBookForm({ onSubmit, onCancel, initialData }: AddBookFormProp
         <Label htmlFor="author" className="text-foreground">
           Author
         </Label>
-        <Select value={author} onValueChange={setAuthor}>
+        <Select value={authorId} onValueChange={setAuthorId}>
           <SelectTrigger className="border-border bg-input text-foreground">
             <SelectValue placeholder="Select author" />
           </SelectTrigger>
           <SelectContent className="border-border bg-popover">
-            {authors.map((a) => (
-              <SelectItem key={a} value={a} className="text-popover-foreground">
-                {a}
+            {authorsList.map((a) => (
+              <SelectItem key={a.author_id} value={a.author_id.toString()} className="text-popover-foreground">
+                {a.author_name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -77,14 +94,14 @@ export function AddBookForm({ onSubmit, onCancel, initialData }: AddBookFormProp
         <Label htmlFor="publisher" className="text-foreground">
           Publisher
         </Label>
-        <Select value={publisher} onValueChange={setPublisher}>
+        <Select value={publisherId} onValueChange={setPublisherId}>
           <SelectTrigger className="border-border bg-input text-foreground">
             <SelectValue placeholder="Select publisher" />
           </SelectTrigger>
           <SelectContent className="border-border bg-popover">
-            {publishers.map((p) => (
-              <SelectItem key={p} value={p} className="text-popover-foreground">
-                {p}
+            {publishersList.map((p) => (
+              <SelectItem key={p.publisher_id} value={p.publisher_id.toString()} className="text-popover-foreground">
+                {p.publisher_name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -121,25 +138,6 @@ export function AddBookForm({ onSubmit, onCancel, initialData }: AddBookFormProp
           required
           className="border-border bg-input text-foreground placeholder:text-muted-foreground"
         />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="status" className="text-foreground">
-          Availability Status
-        </Label>
-        <Select value={available ? "available" : "borrowed"} onValueChange={(v) => setAvailable(v === "available")}>
-          <SelectTrigger className="border-border bg-input text-foreground">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="border-border bg-popover">
-            <SelectItem value="available" className="text-popover-foreground">
-              Available
-            </SelectItem>
-            <SelectItem value="borrowed" className="text-popover-foreground">
-              Borrowed
-            </SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
